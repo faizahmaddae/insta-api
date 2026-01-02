@@ -142,6 +142,7 @@ class AccountManager:
         Load accounts from environment variables.
         Format 1: INSTAGRAM_ACCOUNTS=user1:pass1,user2:pass2
         Format 2: INSTAGRAM_ACCOUNTS=[{"username":"user1","password":"pass1"}]
+        Format 3: INSTAGRAM_ACCOUNTS={"accounts":[{"username":"user1","password":"pass1"}]}
         
         Returns:
             Number of accounts loaded
@@ -154,26 +155,42 @@ class AccountManager:
             return 0
         
         loaded = 0
+        accounts_str = accounts_str.strip()
+        
         with self._accounts_lock:
             # Try JSON format first (handles special characters in passwords)
-            if accounts_str.strip().startswith("["):
+            if accounts_str.startswith("[") or accounts_str.startswith("{"):
                 try:
-                    accounts_data = json.loads(accounts_str)
+                    data = json.loads(accounts_str)
+                    
+                    # Handle {"accounts": [...]} format (like accounts.json)
+                    if isinstance(data, dict) and "accounts" in data:
+                        accounts_data = data["accounts"]
+                    # Handle [...] format (flat array)
+                    elif isinstance(data, list):
+                        accounts_data = data
+                    else:
+                        logger.warning(f"Unknown JSON structure for INSTAGRAM_ACCOUNTS")
+                        accounts_data = []
+                    
                     for acc in accounts_data:
-                        self._accounts.append(AccountInfo(
-                            username=acc["username"],
-                            password=acc["password"],
-                            enabled=acc.get("enabled", True)
-                        ))
-                        loaded += 1
+                        if isinstance(acc, dict) and "username" in acc and "password" in acc:
+                            self._accounts.append(AccountInfo(
+                                username=acc["username"],
+                                password=acc["password"],
+                                enabled=acc.get("enabled", True)
+                            ))
+                            loaded += 1
+                    
                     logger.info(f"Loaded {loaded} accounts from environment (JSON format)")
                     return loaded
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse INSTAGRAM_ACCOUNTS as JSON: {e}")
+                    logger.warning(f"Failed to parse INSTAGRAM_ACCOUNTS as JSON: {e}, trying simple format")
             
             # Fall back to simple format: user1:pass1,user2:pass2
             for pair in accounts_str.split(","):
-                if ":" in pair:
+                pair = pair.strip()
+                if ":" in pair and not pair.startswith("{") and not pair.startswith('"'):
                     username, password = pair.split(":", 1)
                     self._accounts.append(AccountInfo(
                         username=username.strip(),
