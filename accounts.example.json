@@ -1,0 +1,28 @@
+{
+  "accounts": [
+    {
+      "username": "faiz1@topjow.org",
+      "password": "Oy27=r;oo4Ai",
+      "enabled": true,
+      "notes": "Main account"
+    },
+    {
+      "username": "faiz2@topjow.org",
+      "password": "Oy27=r;oo4Ai",
+      "enabled": true,
+      "notes": "Backup account"
+    },
+    {
+      "username": "faiz3@topjow.org",
+      "password": "Oy27=r;oo4Ai",
+      "enabled": true,
+      "notes": "Disabled - rate limited"
+    },
+    {
+      "username": "faiz4@topjow.org",
+      "password": "Oy27=r;oo4Ai",
+      "enabled": true,
+      "notes": "Disabled - rate limited"
+    }
+  ]
+}
