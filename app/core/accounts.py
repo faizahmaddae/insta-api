@@ -140,18 +140,38 @@ class AccountManager:
     def load_from_env(self) -> int:
         """
         Load accounts from environment variables.
-        Format: INSTAGRAM_ACCOUNTS=user1:pass1,user2:pass2
+        Format 1: INSTAGRAM_ACCOUNTS=user1:pass1,user2:pass2
+        Format 2: INSTAGRAM_ACCOUNTS=[{"username":"user1","password":"pass1"}]
         
         Returns:
             Number of accounts loaded
         """
         import os
+        import json
         accounts_str = os.getenv("INSTAGRAM_ACCOUNTS", "")
         
         if not accounts_str:
             return 0
         
+        loaded = 0
         with self._accounts_lock:
+            # Try JSON format first (handles special characters in passwords)
+            if accounts_str.strip().startswith("["):
+                try:
+                    accounts_data = json.loads(accounts_str)
+                    for acc in accounts_data:
+                        self._accounts.append(AccountInfo(
+                            username=acc["username"],
+                            password=acc["password"],
+                            enabled=acc.get("enabled", True)
+                        ))
+                        loaded += 1
+                    logger.info(f"Loaded {loaded} accounts from environment (JSON format)")
+                    return loaded
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse INSTAGRAM_ACCOUNTS as JSON: {e}")
+            
+            # Fall back to simple format: user1:pass1,user2:pass2
             for pair in accounts_str.split(","):
                 if ":" in pair:
                     username, password = pair.split(":", 1)
@@ -159,9 +179,10 @@ class AccountManager:
                         username=username.strip(),
                         password=password.strip()
                     ))
+                    loaded += 1
         
-        logger.info(f"Loaded {len(self._accounts)} accounts from environment")
-        return len(self._accounts)
+        logger.info(f"Loaded {loaded} accounts from environment")
+        return loaded
     
     def add_account(self, username: str, password: str, notes: str = "") -> bool:
         """Add a new account."""
