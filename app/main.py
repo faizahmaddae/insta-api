@@ -103,8 +103,8 @@ Extract media URLs from Instagram posts, reels, profiles, and stories.
         version=settings.app_version,
         debug=settings.debug,
         lifespan=lifespan,
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
+        docs_url="/docs",  # Always enabled
+        redoc_url="/redoc",  # Always enabled
     )
     
     # Exception handlers
