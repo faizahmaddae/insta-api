@@ -195,9 +195,37 @@ class InstaloaderService:
                 self._settings.downloads_path / "{target}"
             )
             
-            # Try to load existing session for this account
+            # Try to load session from multiple sources (in order of priority):
+            # 1. Environment variable (INSTAGRAM_SESSIONS) - for Render/cloud deployment
+            # 2. Session file on disk
+            # 3. Fresh login
+            
+            session_loaded = False
+            
+            # 1. Try environment variable first (base64 encoded pickle)
+            import os
+            import base64
+            env_sessions = os.getenv("INSTAGRAM_SESSIONS", "")
+            if env_sessions and not session_loaded:
+                try:
+                    # Format: username1:base64data,username2:base64data
+                    for pair in env_sessions.split(","):
+                        if ":" in pair:
+                            username, b64data = pair.split(":", 1)
+                            if username.strip() == account.username:
+                                import pickle
+                                cookies = pickle.loads(base64.b64decode(b64data.strip()))
+                                loader.context._session.cookies.update(cookies)
+                                loader.context.username = account.username.split('@')[0]
+                                session_loaded = True
+                                logger.info(f"Loaded session for {account.username} from env var")
+                                break
+                except Exception as e:
+                    logger.warning(f"Failed to load session from env for {account.username}: {e}")
+            
+            # 2. Try session file on disk
             session_file = self._settings.session_path / f"session-{account.username}"
-            if session_file.exists():
+            if session_file.exists() and not session_loaded:
                 try:
                     # Load cookies directly (more reliable than load_session_from_file)
                     import pickle
@@ -206,18 +234,13 @@ class InstaloaderService:
                     loader.context._session.cookies.update(cookies)
                     # Set username (without @domain part if present)
                     loader.context.username = account.username.split('@')[0]
-                    logger.info(f"Loaded session for {account.username} (sessionid present: {'sessionid' in [c.name for c in cookies]})")
+                    session_loaded = True
+                    logger.info(f"Loaded session for {account.username} from file (sessionid present: {'sessionid' in [c.name for c in cookies]})")
                 except Exception as e:
-                    logger.warning(f"Session load failed for {account.username}: {e}, logging in fresh")
-                    try:
-                        loader.login(account.username, account.password)
-                        loader.save_session_to_file(str(session_file))
-                    except Exception as login_e:
-                        account.last_error = str(login_e)
-                        logger.error(f"Login failed for {account.username}: {login_e}")
-                        raise
-            else:
-                # No session, login fresh
+                    logger.warning(f"Session file load failed for {account.username}: {e}")
+            
+            # 3. No session available, try fresh login
+            if not session_loaded:
                 try:
                     loader.login(account.username, account.password)
                     self._settings.session_path.mkdir(parents=True, exist_ok=True)

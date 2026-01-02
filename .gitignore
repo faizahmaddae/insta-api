@@ -129,5 +129,6 @@ Thumbs.db
 
 # Project specific
 sessions/
+sessions_export.txt
 downloads/
 *.session
