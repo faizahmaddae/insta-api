@@ -2,9 +2,10 @@ services:
   - type: web
     name: insta-api
     runtime: python
-    plan: starter  # or 'free' for testing (has sleep after 15 min inactivity)
+    plan: free  # Free tier: 512MB RAM, sleeps after 15 min inactivity
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2
+    # IMPORTANT: Only 1 worker for free tier (512MB RAM limit)
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
